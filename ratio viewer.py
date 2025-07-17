@@ -172,7 +172,8 @@ class MainWindow(QMainWindow, Ui_LrMap):
         self.barView.setObjectName('barView')
         self.mainLayout.addWidget(self.barView, 1, 1, 2, 2)
         self.barView.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.barItem = pg.BarGraphItem(x=np.array([]), height=np.array([]), width=0.3)
+        self.barItemT = pg.BarGraphItem(x=np.array([]), height=np.array([]), width=0.3)
+        self.barItemF = pg.BarGraphItem(x=np.array([]), height=np.array([]), width=0.3)
 
         # 2d plot
         self.g2d = pg.PlotWidget(background=[255, 255, 255, 255])
@@ -335,8 +336,6 @@ class MainWindow(QMainWindow, Ui_LrMap):
         absorb = _amp / (poly_pre[0] * self.energy[e0] + poly_pre[1])
         degree = np.arange(2)
         threshold = 0.6
-        fig = plt.figure()
-        ax1 = fig.add_subplot(131)
         fit = (_amp + 0.2) * 0.9  # post 02
         dist = np.abs(absorb - fit)
         ci = dist
@@ -349,6 +348,8 @@ class MainWindow(QMainWindow, Ui_LrMap):
         color[dist < threshold if self.upper else dist > threshold] = np.array([0, 0, 0])
         # color[_amp < 1.2] = np.array([0, 0, 0, 1])
         brushes = [pg.mkBrush(*rgb) for rgb in color]
+        self.fitLine.setData(x=_amp, y=fit, color=(255, 0, 0))
+        self.g2d.addItem(self.fitLine)
         self.scatter.addPoints([{'x': _amp[i], 'y': absorb[i], 'brush':brushes[i]} for i in range(_amp.shape[0])])
         self.g2d.addItem(self.scatter)
         # ax1.plot(_amp, fit, c='r', label='fitting line')
@@ -356,8 +357,17 @@ class MainWindow(QMainWindow, Ui_LrMap):
         # ax1.set_xlabel('Δμt', fontsize=15)
         # ax1.set_ylabel('A$E_{0}$+B', fontsize=15)
         # ax1.legend()
-        # bar graph
 
+        # bar graph
+        rdf = np.unique(np.round(dist, 2), return_counts=True)
+        rdf_select = (rdf[0] >= threshold) if self.upper else (rdf[0] <= threshold)
+        ci = (rdf[0][rdf_select] - rdf[0][rdf_select].min()) / (rdf[0][rdf_select].max() - rdf[0][rdf_select].min())
+        color = (cm(ci.clip(0, 1))[:, :3] * 255).astype(int)
+        brushes = [pg.mkBrush(*rgb) for rgb in color]
+        self.barItemT.setData(x=rdf[0][rdf_select], height=rdf[1][rdf_select], width=0.005, brush=brushes)
+        self.barItemF.setData(x=rdf[0][~rdf_select], hieght=rdf[1][~rdf_select], width=0.005, brush='k')
+        self.barView.addItem(self.barItemT)
+        self.barView.addItem(self.barItemF)
 
         # init_3dplot(self.g3d, grid=False, background=[0, 0, 0], alpha=1.0, view=50000, title='example',
         #             size=[int(self.darray.max()), int(self.darray.max()), int(self.darray.max())])
